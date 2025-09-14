@@ -20,6 +20,7 @@ interface VoiceRecorderProps {
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionComplete }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
+  const [interimTranscription, setInterimTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -42,25 +43,36 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
         
         recognition.onresult = (event) => {
           let finalTranscript = '';
+          let interimTranscript = '';
           
           for (let i = event.resultIndex; i < event.results.length; i++) {
             if (event.results[i].isFinal) {
               finalTranscript += event.results[i][0].transcript + ' ';
+            } else {
+              interimTranscript += event.results[i][0].transcript;
             }
           }
           
           if (finalTranscript) {
-            setTranscription(prev => prev + finalTranscript);
+            setTranscription(prev => {
+              const newTranscription = prev + finalTranscript;
+              onTranscriptionComplete(newTranscription); // Auto-update parent component
+              return newTranscription;
+            });
           }
+          
+          setInterimTranscription(interimTranscript);
         };
         
         recognition.onerror = (event) => {
           console.error('Speech recognition error:', event.error);
-          toast({
-            title: "Speech Recognition Error",
-            description: "There was an issue with speech recognition. Please try again.",
-            variant: "destructive",
-          });
+          if (event.error !== 'no-speech') {
+            toast({
+              title: "Speech Recognition Error",
+              description: "There was an issue with speech recognition. Please try again.",
+              variant: "destructive",
+            });
+          }
         };
         
         recognition.start();
@@ -75,9 +87,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
       
     } catch (error) {
       console.error('Error starting recording:', error);
+      const errorMessage = error instanceof Error && error.name === 'NotAllowedError' 
+        ? "Please allow microphone access and try again."
+        : "Could not access microphone. Please check permissions.";
+      
       toast({
-        title: "Recording Error",
-        description: "Could not access microphone. Please check permissions.",
+        title: "Microphone Access Required",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -90,19 +106,21 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
     }
     
     setIsRecording(false);
+    setInterimTranscription('');
     setIsTranscribing(false);
     
     if (transcription.trim()) {
       onTranscriptionComplete(transcription);
       toast({
         title: "Transcription Complete",
-        description: "Your recording has been transcribed successfully.",
+        description: "Your recording has been transcribed successfully. Generate Notes is now enabled!",
       });
     }
   }, [transcription, onTranscriptionComplete, toast]);
 
   const clearTranscription = useCallback(() => {
     setTranscription('');
+    setInterimTranscription('');
     onTranscriptionComplete('');
     toast({
       title: "Workspace Cleared",
@@ -199,15 +217,34 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
       </Card>
 
       {/* Transcription Display */}
-      {transcription && (
+      {(transcription || isRecording) && (
         <Card className="p-6 bg-surface-elevated border-border/50 shadow-elegant">
           <div className="flex items-center gap-2 mb-4">
             <MicrophoneIcon className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold text-card-foreground">Transcribed Text</h3>
+            <h3 className="text-lg font-semibold text-card-foreground">
+              {isRecording ? 'Live Transcription' : 'Transcribed Text'}
+            </h3>
+            {isRecording && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <div className="w-2 h-2 bg-destructive rounded-full animate-pulse"></div>
+                Live
+              </div>
+            )}
           </div>
           <div className="bg-surface p-4 rounded-lg border border-border/30 max-h-60 overflow-y-auto">
             <p className="text-card-foreground whitespace-pre-wrap leading-relaxed">
-              {transcription || 'Your transcription will appear here...'}
+              {transcription}
+              {interimTranscription && (
+                <span className="text-muted-foreground italic">
+                  {interimTranscription}
+                </span>
+              )}
+              {!transcription && !interimTranscription && isRecording && (
+                <span className="text-muted-foreground">Start speaking... your words will appear here in real-time</span>
+              )}
+              {!transcription && !isRecording && (
+                <span className="text-muted-foreground">Your transcription will appear here...</span>
+              )}
             </p>
           </div>
         </Card>
