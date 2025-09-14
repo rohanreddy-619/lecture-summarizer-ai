@@ -40,49 +40,93 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
         
         recognition.onresult = (event) => {
+          console.log('Speech recognition result received:', event.results.length);
           let finalTranscript = '';
           let interimTranscript = '';
           
           for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            console.log(`Result ${i}: "${transcript}" (final: ${event.results[i].isFinal})`);
+            
             if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript + ' ';
+              finalTranscript += transcript + ' ';
             } else {
-              interimTranscript += event.results[i][0].transcript;
+              interimTranscript += transcript;
             }
           }
           
           if (finalTranscript) {
+            console.log('Adding final transcript:', finalTranscript);
             setTranscription(prev => {
               const newTranscription = prev + finalTranscript;
+              console.log('New total transcription:', newTranscription);
               onTranscriptionComplete(newTranscription); // Auto-update parent component
               return newTranscription;
             });
           }
           
+          if (interimTranscript) {
+            console.log('Updating interim transcript:', interimTranscript);
+          }
           setInterimTranscription(interimTranscript);
         };
         
         recognition.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-          if (event.error !== 'no-speech') {
+          console.log('Speech recognition error:', event.error);
+          // Only show error toast for serious errors, not no-speech
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
             toast({
-              title: "Speech Recognition Error",
-              description: "There was an issue with speech recognition. Please try again.",
+              title: "Microphone Access Required",
+              description: "Please allow microphone access and try again.",
+              variant: "destructive",
+            });
+            setIsRecording(false);
+          } else if (event.error === 'network') {
+            toast({
+              title: "Network Error",
+              description: "Please check your internet connection.",
               variant: "destructive",
             });
           }
+          // For 'no-speech', 'audio-capture', and other non-critical errors, just log them
         };
         
-        recognition.start();
-        recognitionRef.current = recognition;
+        recognition.onend = () => {
+          console.log('Speech recognition ended');
+          // Automatically restart if we're still supposed to be recording
+          if (isRecording && recognitionRef.current) {
+            console.log('Restarting speech recognition...');
+            try {
+              recognition.start();
+            } catch (error) {
+              console.log('Error restarting recognition:', error);
+            }
+          }
+        };
+        
+        recognition.onstart = () => {
+          console.log('Speech recognition started');
+          setIsTranscribing(true);
+        };
+        
+        try {
+          recognition.start();
+          recognitionRef.current = recognition;
+        } catch (error) {
+          console.log('Error starting recognition:', error);
+          throw error;
+        }
+      } else {
+        throw new Error('Speech Recognition not supported in this browser');
       }
       
       setIsRecording(true);
       toast({
         title: "Recording Started",
-        description: "Speak clearly for best transcription results.",
+        description: "Start speaking! Your words will appear below in real-time.",
       });
       
     } catch (error) {
@@ -100,20 +144,31 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
   }, [toast]);
 
   const stopRecording = useCallback(() => {
+    console.log('Stopping recording...');
+    setIsRecording(false);
+    setIsTranscribing(false);
+    
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.log('Error stopping recognition:', error);
+      }
       recognitionRef.current = null;
     }
     
-    setIsRecording(false);
     setInterimTranscription('');
-    setIsTranscribing(false);
     
     if (transcription.trim()) {
       onTranscriptionComplete(transcription);
       toast({
-        title: "Transcription Complete",
-        description: "Your recording has been transcribed successfully. Generate Notes is now enabled!",
+        title: "Recording Stopped",
+        description: "Transcription complete! You can now generate notes.",
+      });
+    } else {
+      toast({
+        title: "Recording Stopped",
+        description: "No speech was detected. Please try speaking louder or closer to the microphone.",
       });
     }
   }, [transcription, onTranscriptionComplete, toast]);
