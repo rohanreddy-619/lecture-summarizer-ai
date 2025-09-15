@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Upload, Download, RotateCcw, FileAudio, Play, Pause } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { pipeline } from '@xenova/transformers';
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string) => void;
@@ -59,30 +60,36 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
     setIsTranscribing(true);
     
     try {
-      // Simulate transcription process (replace with actual API call)
       toast({
         title: "Transcription Started",
-        description: "Processing your audio file...",
+        description: "Loading Whisper model and processing your audio...",
       });
 
-      // For demo purposes, we'll simulate transcription
-      // In a real app, you'd send the file to a transcription service
-      setTimeout(() => {
-        const mockTranscription = `This is a demo transcription of your uploaded audio file: ${uploadedFile.name}. 
-
-In a real implementation, this would be the actual transcribed text from your MP3 or WAV file. The transcription would contain all the spoken words from your audio recording, properly formatted and ready for note generation.
-
-You can now click the "Generate Notes" button to create AI-powered study notes from this transcription.`;
-        
-        setTranscription(mockTranscription);
-        onTranscriptionComplete(mockTranscription);
-        setIsTranscribing(false);
-        
-        toast({
-          title: "Transcription Complete",
-          description: "Your audio has been converted to text!",
-        });
-      }, 3000);
+      // Initialize the Whisper pipeline
+      const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+      
+      // Create URL for the audio file that the pipeline can process
+      const audioUrl = URL.createObjectURL(uploadedFile);
+      
+      // Transcribe the audio
+      const result = await transcriber(audioUrl);
+      
+      // Handle the result - it could be a single object or array
+      const transcribedText = Array.isArray(result) 
+        ? (result[0]?.text || "No speech detected in the audio file.")
+        : (result?.text || "No speech detected in the audio file.");
+      
+      setTranscription(transcribedText);
+      onTranscriptionComplete(transcribedText);
+      setIsTranscribing(false);
+      
+      // Clean up the created URL
+      URL.revokeObjectURL(audioUrl);
+      
+      toast({
+        title: "Transcription Complete",
+        description: "Your audio has been converted to text!",
+      });
 
     } catch (error) {
       console.error('Error transcribing audio:', error);
