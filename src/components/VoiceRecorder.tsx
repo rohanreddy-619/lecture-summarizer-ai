@@ -1,187 +1,105 @@
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MicrophoneIcon } from '@/components/ui/microphone-icon';
-import { Square, Download, RotateCcw, Sparkles } from 'lucide-react';
+import { Upload, Download, RotateCcw, FileAudio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-// Type definitions for Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string) => void;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionComplete }) => {
-  const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
-  const [interimTranscription, setInterimTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const startRecording = useCallback(async () => {
-    try {
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Initialize Web Speech API
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-        recognition.maxAlternatives = 1;
-        
-        recognition.onresult = (event) => {
-          console.log('Speech recognition result received:', event.results.length);
-          let finalTranscript = '';
-          let interimTranscript = '';
-          
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            console.log(`Result ${i}: "${transcript}" (final: ${event.results[i].isFinal})`);
-            
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript + ' ';
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-          
-          if (finalTranscript) {
-            console.log('Adding final transcript:', finalTranscript);
-            setTranscription(prev => {
-              const newTranscription = prev + finalTranscript;
-              console.log('New total transcription:', newTranscription);
-              onTranscriptionComplete(newTranscription); // Auto-update parent component
-              return newTranscription;
-            });
-          }
-          
-          if (interimTranscript) {
-            console.log('Updating interim transcript:', interimTranscript);
-          }
-          setInterimTranscription(interimTranscript);
-        };
-        
-        recognition.onerror = (event) => {
-          console.log('Speech recognition error:', event.error);
-          // Only show error toast for serious errors, not no-speech
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            toast({
-              title: "Microphone Access Required",
-              description: "Please allow microphone access and try again.",
-              variant: "destructive",
-            });
-            setIsRecording(false);
-          } else if (event.error === 'network') {
-            toast({
-              title: "Network Error",
-              description: "Please check your internet connection.",
-              variant: "destructive",
-            });
-          }
-          // For 'no-speech', 'audio-capture', and other non-critical errors, just log them
-        };
-        
-        recognition.onend = () => {
-          console.log('Speech recognition ended');
-          // Automatically restart if we're still supposed to be recording
-          if (isRecording && recognitionRef.current) {
-            console.log('Restarting speech recognition...');
-            try {
-              recognition.start();
-            } catch (error) {
-              console.log('Error restarting recognition:', error);
-            }
-          }
-        };
-        
-        recognition.onstart = () => {
-          console.log('Speech recognition started');
-          setIsTranscribing(true);
-        };
-        
-        try {
-          recognition.start();
-          recognitionRef.current = recognition;
-        } catch (error) {
-          console.log('Error starting recognition:', error);
-          throw error;
-        }
-      } else {
-        throw new Error('Speech Recognition not supported in this browser');
-      }
-      
-      setIsRecording(true);
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check if file is audio format
+    const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/wave'];
+    if (!allowedTypes.includes(file.type)) {
       toast({
-        title: "Recording Started",
-        description: "Start speaking! Your words will appear below in real-time.",
+        title: "Invalid File Type",
+        description: "Please upload an MP3 or WAV audio file.",
+        variant: "destructive",
       });
-      
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      const errorMessage = error instanceof Error && error.name === 'NotAllowedError' 
-        ? "Please allow microphone access and try again."
-        : "Could not access microphone. Please check permissions.";
-      
+      return;
+    }
+
+    setUploadedFile(file);
+    toast({
+      title: "File Uploaded",
+      description: `${file.name} is ready for transcription.`,
+    });
+  }, [toast]);
+
+  const transcribeAudio = useCallback(async () => {
+    if (!uploadedFile) {
       toast({
-        title: "Microphone Access Required",
-        description: errorMessage,
+        title: "No File Selected",
+        description: "Please upload an audio file first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTranscribing(true);
+    
+    try {
+      // Simulate transcription process (replace with actual API call)
+      toast({
+        title: "Transcription Started",
+        description: "Processing your audio file...",
+      });
+
+      // For demo purposes, we'll simulate transcription
+      // In a real app, you'd send the file to a transcription service
+      setTimeout(() => {
+        const mockTranscription = `This is a demo transcription of your uploaded audio file: ${uploadedFile.name}. 
+
+In a real implementation, this would be the actual transcribed text from your MP3 or WAV file. The transcription would contain all the spoken words from your audio recording, properly formatted and ready for note generation.
+
+You can now click the "Generate Notes" button to create AI-powered study notes from this transcription.`;
+        
+        setTranscription(mockTranscription);
+        onTranscriptionComplete(mockTranscription);
+        setIsTranscribing(false);
+        
+        toast({
+          title: "Transcription Complete",
+          description: "Your audio has been converted to text!",
+        });
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      setIsTranscribing(false);
+      toast({
+        title: "Transcription Failed",
+        description: "Could not transcribe the audio file. Please try again.",
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [uploadedFile, onTranscriptionComplete, toast]);
 
-  const stopRecording = useCallback(() => {
-    console.log('Stopping recording...');
-    setIsRecording(false);
-    setIsTranscribing(false);
-    
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (error) {
-        console.log('Error stopping recognition:', error);
-      }
-      recognitionRef.current = null;
-    }
-    
-    setInterimTranscription('');
-    
-    if (transcription.trim()) {
-      onTranscriptionComplete(transcription);
-      toast({
-        title: "Recording Stopped",
-        description: "Transcription complete! You can now generate notes.",
-      });
-    } else {
-      toast({
-        title: "Recording Stopped",
-        description: "No speech was detected. Please try speaking louder or closer to the microphone.",
-      });
-    }
-  }, [transcription, onTranscriptionComplete, toast]);
-
-  const clearTranscription = useCallback(() => {
+  const clearWorkspace = useCallback(() => {
     setTranscription('');
-    setInterimTranscription('');
+    setUploadedFile(null);
     onTranscriptionComplete('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     toast({
       title: "Workspace Cleared",
-      description: "Ready for a new recording session.",
+      description: "Ready for a new audio file.",
     });
   }, [onTranscriptionComplete, toast]);
+
 
   const downloadTranscription = useCallback(() => {
     if (!transcription.trim()) {
@@ -216,90 +134,94 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
             AI Notes Generator
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Record lectures, discussions, or meetings and get AI-powered summarized notes instantly
+            Upload your audio files (MP3/WAV) and get AI-powered transcription and summarized notes instantly
           </p>
           
-          <div className="flex justify-center gap-4 flex-wrap">
-            {!isRecording ? (
+          <div className="space-y-4">
+            {/* File Upload Section */}
+            <div className="flex flex-col items-center gap-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".mp3,.wav,audio/mp3,audio/mpeg,audio/wav,audio/wave"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
               <Button
-                onClick={startRecording}
+                onClick={() => fileInputRef.current?.click()}
                 size="lg"
                 className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-glow"
               >
-                <MicrophoneIcon className="w-5 h-5 mr-2" />
-                Start Recording
+                <Upload className="w-5 h-5 mr-2" />
+                Upload Audio File
               </Button>
-            ) : (
+              
+              {uploadedFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-surface-elevated px-3 py-2 rounded-md border border-border/50">
+                  <FileAudio className="w-4 h-4 text-primary" />
+                  <span>{uploadedFile.name}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex justify-center gap-4 flex-wrap">
               <Button
-                onClick={stopRecording}
+                onClick={transcribeAudio}
                 size="lg"
-                variant="destructive"
+                variant="secondary"
+                disabled={!uploadedFile || isTranscribing}
                 className="shadow-glow"
               >
-                <Square className="w-5 h-5 mr-2" />
-                Stop Recording
+                {isTranscribing ? (
+                  <>
+                    <div className="w-5 h-5 mr-2 animate-spin border-2 border-current border-t-transparent rounded-full"></div>
+                    Transcribing...
+                  </>
+                ) : (
+                  <>
+                    <FileAudio className="w-5 h-5 mr-2" />
+                    Transcribe
+                  </>
+                )}
               </Button>
-            )}
-            
-            <Button
-              onClick={clearTranscription}
-              variant="secondary"
-              size="lg"
-              disabled={!transcription.trim()}
-            >
-              <RotateCcw className="w-5 h-5 mr-2" />
-              Clear
-            </Button>
-            
-            <Button
-              onClick={downloadTranscription}
-              variant="secondary"
-              size="lg"
-              disabled={!transcription.trim()}
-            >
-              <Download className="w-5 h-5 mr-2" />
-              Download
-            </Button>
-          </div>
-          
-          {isRecording && (
-            <div className="flex items-center justify-center gap-2 text-destructive">
-              <div className="w-3 h-3 bg-destructive rounded-full animate-pulse"></div>
-              <span className="font-medium">Recording in progress...</span>
+              
+              <Button
+                onClick={clearWorkspace}
+                variant="secondary"
+                size="lg"
+                disabled={!uploadedFile && !transcription.trim()}
+              >
+                <RotateCcw className="w-5 h-5 mr-2" />
+                Clear
+              </Button>
+              
+              <Button
+                onClick={downloadTranscription}
+                variant="secondary"
+                size="lg"
+                disabled={!transcription.trim()}
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Download
+              </Button>
             </div>
-          )}
+          </div>
         </div>
       </Card>
 
       {/* Transcription Display */}
-      {(transcription || isRecording) && (
+      {transcription && (
         <Card className="p-6 bg-surface-elevated border-border/50 shadow-elegant">
           <div className="flex items-center gap-2 mb-4">
-            <MicrophoneIcon className="w-5 h-5 text-primary" />
+            <FileAudio className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold text-card-foreground">
-              {isRecording ? 'Live Transcription' : 'Transcribed Text'}
+              Transcribed Text
             </h3>
-            {isRecording && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <div className="w-2 h-2 bg-destructive rounded-full animate-pulse"></div>
-                Live
-              </div>
-            )}
           </div>
           <div className="bg-surface p-4 rounded-lg border border-border/30 max-h-60 overflow-y-auto">
             <p className="text-card-foreground whitespace-pre-wrap leading-relaxed">
               {transcription}
-              {interimTranscription && (
-                <span className="text-muted-foreground italic">
-                  {interimTranscription}
-                </span>
-              )}
-              {!transcription && !interimTranscription && isRecording && (
-                <span className="text-muted-foreground">Start speaking... your words will appear here in real-time</span>
-              )}
-              {!transcription && !isRecording && (
-                <span className="text-muted-foreground">Your transcription will appear here...</span>
-              )}
             </p>
           </div>
         </Card>
