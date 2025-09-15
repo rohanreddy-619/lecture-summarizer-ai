@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Upload, Download, RotateCcw, FileAudio } from 'lucide-react';
+import { Upload, Download, RotateCcw, FileAudio, Play, Pause } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface VoiceRecorderProps {
@@ -12,8 +12,11 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,9 +35,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
     }
 
     setUploadedFile(file);
+    
+    // Create audio URL for playback
+    const url = URL.createObjectURL(file);
+    setAudioUrl(url);
+    
     toast({
       title: "File Uploaded",
-      description: `${file.name} is ready for transcription.`,
+      description: `${file.name} is ready for transcription and playback.`,
     });
   }, [toast]);
 
@@ -87,9 +95,33 @@ You can now click the "Generate Notes" button to create AI-powered study notes f
     }
   }, [uploadedFile, onTranscriptionComplete, toast]);
 
+  const togglePlayPause = useCallback(() => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying]);
+
+  const handleAudioEnded = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
   const clearWorkspace = useCallback(() => {
     setTranscription('');
     setUploadedFile(null);
+    setIsPlaying(false);
+    
+    // Clean up audio URL
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    
     onTranscriptionComplete('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -98,7 +130,7 @@ You can now click the "Generate Notes" button to create AI-powered study notes f
       title: "Workspace Cleared",
       description: "Ready for a new audio file.",
     });
-  }, [onTranscriptionComplete, toast]);
+  }, [onTranscriptionComplete, audioUrl, toast]);
 
 
   const downloadTranscription = useCallback(() => {
@@ -157,9 +189,42 @@ You can now click the "Generate Notes" button to create AI-powered study notes f
               </Button>
               
               {uploadedFile && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-surface-elevated px-3 py-2 rounded-md border border-border/50">
-                  <FileAudio className="w-4 h-4 text-primary" />
-                  <span>{uploadedFile.name}</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-surface-elevated px-3 py-2 rounded-md border border-border/50">
+                    <FileAudio className="w-4 h-4 text-primary" />
+                    <span>{uploadedFile.name}</span>
+                  </div>
+                  
+                  {/* Audio Player Controls */}
+                  <div className="flex items-center justify-center gap-3">
+                    <Button
+                      onClick={togglePlayPause}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      {isPlaying ? (
+                        <>
+                          <Pause className="w-4 h-4" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4" />
+                          Play Audio
+                        </>
+                      )}
+                    </Button>
+                    
+                    {audioUrl && (
+                      <audio
+                        ref={audioRef}
+                        src={audioUrl}
+                        onEnded={handleAudioEnded}
+                        className="hidden"
+                      />
+                    )}
+                  </div>
                 </div>
               )}
             </div>
