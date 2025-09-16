@@ -35,16 +35,43 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
       return;
     }
 
-    setUploadedFile(file);
-    
-    // Create audio URL for playback
+    // Check file duration using audio element
+    const audio = new Audio();
     const url = URL.createObjectURL(file);
-    setAudioUrl(url);
     
-    toast({
-      title: "File Uploaded",
-      description: `${file.name} is ready for transcription and playback.`,
-    });
+    audio.onloadedmetadata = () => {
+      const durationInMinutes = audio.duration / 60;
+      
+      // Check if audio is longer than 40 minutes
+      if (durationInMinutes > 40) {
+        toast({
+          title: "File Too Long",
+          description: "Please upload an audio file shorter than 40 minutes.",
+          variant: "destructive",
+        });
+        URL.revokeObjectURL(url);
+        return;
+      }
+      
+      setUploadedFile(file);
+      setAudioUrl(url);
+      
+      toast({
+        title: "File Uploaded",
+        description: `${file.name} (${Math.round(durationInMinutes)}min) is ready for transcription and playback.`,
+      });
+    };
+    
+    audio.onerror = () => {
+      toast({
+        title: "Invalid Audio File",
+        description: "Could not load the audio file. Please try a different file.",
+        variant: "destructive",
+      });
+      URL.revokeObjectURL(url);
+    };
+    
+    audio.src = url;
   }, [toast]);
 
   const transcribeAudio = useCallback(async () => {
@@ -65,19 +92,38 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
         description: "Loading Whisper model and processing your audio...",
       });
 
-      // Initialize the Whisper pipeline
-      const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+      // Use a better Whisper model that can handle longer audio
+      const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base.en');
       
       // Create URL for the audio file that the pipeline can process
       const audioUrl = URL.createObjectURL(uploadedFile);
       
-      // Transcribe the audio
-      const result = await transcriber(audioUrl);
+      // Transcribe the audio with options for better full-audio processing
+      const result = await transcriber(audioUrl, {
+        chunk_length_s: 30,
+        stride_length_s: 5,
+        return_timestamps: false,
+      });
       
       // Handle the result - it could be a single object or array
-      const transcribedText = Array.isArray(result) 
-        ? (result[0]?.text || "No speech detected in the audio file.")
-        : (result?.text || "No speech detected in the audio file.");
+      let transcribedText = '';
+      
+      if (Array.isArray(result)) {
+        // If result is an array of chunks, concatenate all text
+        transcribedText = result.map(chunk => chunk.text || '').join(' ').trim();
+      } else if (result && typeof result === 'object' && 'text' in result) {
+        transcribedText = result.text || '';
+      }
+      
+      if (!transcribedText || transcribedText.length === 0) {
+        transcribedText = "No speech detected in the audio file.";
+      }
+      
+      // Limit to 50,000 words (approximately 300,000 characters)
+      const words = transcribedText.split(/\s+/);
+      if (words.length > 50000) {
+        transcribedText = words.slice(0, 50000).join(' ') + '\n\n[Transcription truncated at 50,000 words]';
+      }
       
       setTranscription(transcribedText);
       onTranscriptionComplete(transcribedText);
@@ -86,9 +132,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
       // Clean up the created URL
       URL.revokeObjectURL(audioUrl);
       
+      const wordCount = transcribedText.split(/\s+/).length;
       toast({
         title: "Transcription Complete",
-        description: "Your audio has been converted to text!",
+        description: `Your audio has been converted to text! (${wordCount.toLocaleString()} words)`,
       });
 
     } catch (error) {
@@ -291,10 +338,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
               Transcribed Text
             </h3>
           </div>
-          <div className="bg-surface p-4 rounded-lg border border-border/30 max-h-60 overflow-y-auto">
-            <p className="text-card-foreground whitespace-pre-wrap leading-relaxed">
+          <div className="bg-surface p-4 rounded-lg border border-border/30 max-h-96 overflow-y-auto">
+            <p className="text-card-foreground whitespace-pre-wrap leading-relaxed text-sm">
               {transcription}
             </p>
+            <div className="mt-2 pt-2 border-t border-border/30 text-xs text-muted-foreground">
+              Words: {transcription.split(/\s+/).filter(word => word.length > 0).length.toLocaleString()}
+            </div>
           </div>
         </Card>
       )}
