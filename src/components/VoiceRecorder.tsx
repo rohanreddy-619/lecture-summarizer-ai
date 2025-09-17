@@ -92,37 +92,79 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
         description: "Loading Whisper model and processing your audio...",
       });
 
-      // Use a better Whisper model that can handle longer audio
+      // Use Whisper base model for better accuracy on longer audio
       const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base.en');
       
       // Create URL for the audio file that the pipeline can process
       const audioUrl = URL.createObjectURL(uploadedFile);
       
-      // Transcribe the audio with options for better full-audio processing
+      console.log('Starting transcription with file:', uploadedFile.name);
+      
+      // Transcribe the complete audio with optimized settings for full coverage
       const result = await transcriber(audioUrl, {
-        chunk_length_s: 30,
-        stride_length_s: 5,
-        return_timestamps: false,
+        // Longer chunks to reduce segmentation issues
+        chunk_length_s: 60,
+        // Larger stride to ensure overlap and continuity
+        stride_length_s: 10,
+        // Return timestamps to debug chunk processing if needed
+        return_timestamps: true,
+        // Force processing of the entire audio
+        force_full_sequences: true,
       });
       
-      // Handle the result - it could be a single object or array
+      console.log('Transcription result:', result);
+      
+      // Handle the result more comprehensively
       let transcribedText = '';
+      let allChunks = [];
       
       if (Array.isArray(result)) {
-        // If result is an array of chunks, concatenate all text
-        transcribedText = result.map(chunk => chunk.text || '').join(' ').trim();
-      } else if (result && typeof result === 'object' && 'text' in result) {
-        transcribedText = result.text || '';
+        // If result is an array of chunks, process each chunk
+        allChunks = result;
+        console.log(`Processing ${result.length} chunks`);
+      } else if (result && typeof result === 'object') {
+        // If single result, convert to array for uniform processing
+        allChunks = [result];
+        console.log('Processing single result');
       }
+      
+      // Extract and combine text from all chunks
+      const textSegments = allChunks
+        .map((chunk, index) => {
+          const text = chunk.text || '';
+          console.log(`Chunk ${index + 1}: "${text.substring(0, 100)}..."`);
+          return text.trim();
+        })
+        .filter(text => text.length > 0);
+      
+      // Join all text segments with proper spacing
+      transcribedText = textSegments.join(' ').trim();
+      
+      // Clean up duplicate words at chunk boundaries
+      const words = transcribedText.split(/\s+/);
+      const cleanedWords = [];
+      
+      for (let i = 0; i < words.length; i++) {
+        const currentWord = words[i];
+        const nextWord = words[i + 1];
+        
+        // Skip if the next word is identical (likely a chunk boundary duplicate)
+        if (currentWord && (!nextWord || currentWord !== nextWord)) {
+          cleanedWords.push(currentWord);
+        }
+      }
+      
+      transcribedText = cleanedWords.join(' ');
       
       if (!transcribedText || transcribedText.length === 0) {
         transcribedText = "No speech detected in the audio file.";
       }
       
+      console.log(`Final transcription length: ${transcribedText.length} characters, ${cleanedWords.length} words`);
+      
       // Limit to 50,000 words (approximately 300,000 characters)
-      const words = transcribedText.split(/\s+/);
-      if (words.length > 50000) {
-        transcribedText = words.slice(0, 50000).join(' ') + '\n\n[Transcription truncated at 50,000 words]';
+      if (cleanedWords.length > 50000) {
+        transcribedText = cleanedWords.slice(0, 50000).join(' ') + '\n\n[Transcription truncated at 50,000 words]';
       }
       
       setTranscription(transcribedText);
@@ -132,7 +174,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
       // Clean up the created URL
       URL.revokeObjectURL(audioUrl);
       
-      const wordCount = transcribedText.split(/\s+/).length;
+      const wordCount = transcribedText.split(/\s+/).filter(word => word.length > 0).length;
       toast({
         title: "Transcription Complete",
         description: `Your audio has been converted to text! (${wordCount.toLocaleString()} words)`,
