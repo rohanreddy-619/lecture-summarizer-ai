@@ -108,10 +108,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
         stride_length_s: 5,
         // Return timestamps for debugging
         return_timestamps: 'word',
-        // Language setting
-        language: 'english',
-        // Task type
-        task: 'transcribe',
       });
       
       console.log('Transcription result:', result);
