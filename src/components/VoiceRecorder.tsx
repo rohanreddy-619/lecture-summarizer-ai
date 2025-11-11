@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Upload, Download, RotateCcw, FileAudio, Play, Pause } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { pipeline } from '@huggingface/transformers';
+import { pipeline } from '@xenova/transformers';
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string) => void;
@@ -93,69 +93,63 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptionCom
       });
 
       // Use Whisper base model for better accuracy on longer audio
-      const transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base.en');
+      const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base.en');
       
       // Create URL for the audio file that the pipeline can process
       const audioUrl = URL.createObjectURL(uploadedFile);
       
       console.log('Starting transcription with file:', uploadedFile.name);
       
-      // Transcribe with optimized settings to capture all audio
+      // Transcribe the complete audio with optimized settings for full coverage
       const result = await transcriber(audioUrl, {
-        // Process in 30-second chunks for better coverage
-        chunk_length_s: 30,
-        // 5-second overlap to prevent missing words at boundaries
-        stride_length_s: 5,
-        // Return timestamps for debugging
-        return_timestamps: 'word',
+        // Longer chunks to reduce segmentation issues
+        chunk_length_s: 60,
+        // Larger stride to ensure overlap and continuity
+        stride_length_s: 10,
+        // Return timestamps to debug chunk processing if needed
+        return_timestamps: true,
+        // Force processing of the entire audio
+        force_full_sequences: true,
       });
       
       console.log('Transcription result:', result);
       
-      // Handle the result comprehensively
+      // Handle the result more comprehensively
       let transcribedText = '';
+      let allChunks = [];
       
-      console.log('Raw transcription result:', result);
-      
-      // The new transformers library returns the text directly or in chunks property
-      if (typeof result === 'string') {
-        transcribedText = result;
-      } else if (Array.isArray(result)) {
-        // If result is an array of outputs
-        transcribedText = result
-          .map((item: any) => {
-            if (typeof item === 'string') return item;
-            if (item && typeof item === 'object' && 'text' in item) return item.text;
-            return '';
-          })
-          .join(' ')
-          .trim();
+      if (Array.isArray(result)) {
+        // If result is an array of chunks, process each chunk
+        allChunks = result;
+        console.log(`Processing ${result.length} chunks`);
       } else if (result && typeof result === 'object') {
-        // Try different possible result structures
-        const resultObj = result as any;
-        if ('text' in resultObj) {
-          transcribedText = resultObj.text;
-        } else if ('chunks' in resultObj && Array.isArray(resultObj.chunks)) {
-          // Process chunks if available
-          transcribedText = resultObj.chunks
-            .map((chunk: any) => chunk.text || '')
-            .join(' ')
-            .trim();
-        }
+        // If single result, convert to array for uniform processing
+        allChunks = [result];
+        console.log('Processing single result');
       }
       
-      console.log(`Raw transcription: ${transcribedText.substring(0, 200)}...`);
+      // Extract and combine text from all chunks
+      const textSegments = allChunks
+        .map((chunk, index) => {
+          const text = chunk.text || '';
+          console.log(`Chunk ${index + 1}: "${text.substring(0, 100)}..."`);
+          return text.trim();
+        })
+        .filter(text => text.length > 0);
+      
+      // Join all text segments with proper spacing
+      transcribedText = textSegments.join(' ').trim();
       
       // Clean up duplicate words at chunk boundaries
-      const words = transcribedText.split(/\s+/).filter(w => w.length > 0);
-      const cleanedWords: string[] = [];
+      const words = transcribedText.split(/\s+/);
+      const cleanedWords = [];
       
       for (let i = 0; i < words.length; i++) {
         const currentWord = words[i];
         const nextWord = words[i + 1];
         
         // Skip if the next word is identical (likely a chunk boundary duplicate)
-        if (currentWord && (!nextWord || currentWord.toLowerCase() !== nextWord.toLowerCase())) {
+        if (currentWord && (!nextWord || currentWord !== nextWord)) {
           cleanedWords.push(currentWord);
         }
       }
