@@ -46,79 +46,80 @@ Focus on understanding the lecture in real-time, and let AI handle the note-taki
 
 ✨ Features
 
-🎙️ Audio Transcription: Upload .mp3 or .wav files and get highly accurate, word-for-word text transcripts using state-of-the-art AI models.
+  🎙️ Audio Transcription: Upload .mp3 or .wav files and get highly accurate, word-for-word text transcripts using state-of-the-art AI models.
 
-📝 Intelligent Summarization: Automatically generates a clear, concise summary of the entire lecture.
+  📝 Intelligent Summarization: Automatically generates a clear, concise summary of the entire lecture.
 
-🔑 Key Points Extraction: Identifies and lists crucial definitions, dates, and concepts in a bulleted format for easy revision.
+  🔑 Key Points Extraction: Identifies and lists crucial definitions, dates, and concepts in a bulleted format for easy revision.
 
-⚡ Fast Processing: Processes hour-long lectures in minutes using asynchronous background jobs.
+  ⚡ Fast Processing: Processes hour-long lectures in minutes using asynchronous background jobs.
 
-🎨 Modern UI: A clean, dark-themed, user-friendly interface built with React and Tailwind CSS.
+  🎨 Modern UI: A clean, dark-themed, user-friendly interface built with React and Tailwind CSS.
 
-🔒 Secure Storage: Your audio files are securely uploaded and processed via Supabase Storage.
+  🔒 Secure Storage: Your audio files are securely uploaded and processed via Supabase Storage.
 
-🛠️ Tech Stack
+  🛠️ Tech Stack
 
 This project uses a robust, modern full-stack architecture:
 
 Frontend
 
-React: The library for web and native user interfaces.
+   React: The library for web and native user interfaces.
 
-TypeScript: Strongly typed JavaScript for safer code.
+   TypeScript: Strongly typed JavaScript for safer code.
 
-Vite: Next Generation Frontend Tooling for blazing fast builds.
+   Vite: Next Generation Frontend Tooling for blazing fast builds.
 
-Tailwind CSS: A utility-first CSS framework for rapid UI development.
+   Tailwind CSS: A utility-first CSS framework for rapid UI development.
 
-shadcn/ui: Beautifully designed components built with Radix UI and Tailwind CSS.
+   shadcn/ui: Beautifully designed components built with Radix UI and Tailwind CSS.
 
 Backend & Services
 
-Supabase: The open source Firebase alternative. Used for:
+   Supabase: The open source Firebase alternative. Used for:
 
-Storage: securely hosting audio files.
+   Storage: securely hosting audio files.
 
-Database: (Optional extension) Storing user note history.
+   Database: (Optional extension) Storing user note history.
 
 AI APIs:
 
-Transcription: OpenAI Whisper (or similar STT service).
+   Transcription: OpenAI Whisper (or similar STT service).
 
-Summarization: OpenAI GPT-4o (or similar LLM).
+   Summarization: OpenAI GPT-4o (or similar LLM).
 
 🏗️ Architecture
 
-The system follows a streamlined data flow:
+  The system follows a streamlined data flow:
 
-User uploads audio file via the React Frontend.
+  User uploads audio file via the React Frontend.
 
-File is securely stored in Supabase Storage.
+  File is securely stored in Supabase Storage.
 
-AI Service retrieves the file and performs Speech-to-Text (STT).
+  AI Service retrieves the file and performs Speech-to-Text (STT).
 
-The raw transcript is sent to the LLM for summarization and formatting.
-
-Final Notes are returned and displayed to the user.
+  The raw transcript is sent to the LLM for summarization and formatting.
+ 
+  Final Notes are returned and displayed to the user.
 
 📸 Screenshots
 
 1. Dashboard
+   <img width="1920" height="1080" alt="Screenshot 2025-11-14 090412" src="https://github.com/user-attachments/assets/2056ba8f-a887-404a-86f0-ea805bebac4d" />
+   Clean, intuitive upload interface
 
-2. File Upload
+3. File Upload
+   <img width="1920" height="1080" alt="Screenshot 2025-11-14 090500" src="https://github.com/user-attachments/assets/bde1a50c-0418-41d1-b5a6-9d7253183da0" />
 
-
-
- Clean, intuitive upload interface
-
-
-
- Drag & drop or select files
+   Drag & drop or select files
 
 3. Processing
+    <img width="1920" height="1080" alt="Screenshot 2025-11-14 090531" src="https://github.com/user-attachments/assets/8d4c1fd9-8b9b-4996-aa5b-912175becea5" />
 
-4. Final Notes
+
+5. Final Notes
+    <img width="1920" height="1080" alt="Screenshot 2025-11-14 090627" src="https://github.com/user-attachments/assets/42a776ed-4d96-46be-8453-bc0da491f333" />
+
 
 
 
