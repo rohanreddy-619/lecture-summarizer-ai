@@ -49,12 +49,11 @@ export const NotesGenerator: React.FC<NotesGeneratorProps> = ({ transcription })
   };
 
   const generateMockNotes = (text: string) => {
-    // Extract 20-25 sentences as key points
+    // Simple mock summarization logic
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    const targetPoints = Math.min(25, Math.max(20, sentences.length));
-    const keyPoints = sentences.slice(0, targetPoints);
+    const keyPoints = sentences.slice(0, Math.min(8, sentences.length));
     
-    // Extract potential keywords
+    // Extract potential keywords and create abbreviations
     const words = text.toLowerCase().split(/\s+/);
     const commonWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'a', 'an']);
     
@@ -65,20 +64,18 @@ export const NotesGenerator: React.FC<NotesGeneratorProps> = ({ transcription })
     
     const processedKeyPoints = keyPoints.map(point => point.trim()).filter(point => point.length > 0);
     
-    // Extract real abbreviations from the text (2-5 uppercase letters)
-    const abbreviationPattern = /\b[A-Z]{2,5}\b/g;
-    const foundAbbreviations = text.match(abbreviationPattern) || [];
-    
-    // Create unique abbreviations list
-    const uniqueAbbreviations = [...new Set(foundAbbreviations)]
-      .map(term => ({
-        term,
-        meaning: `${term} (found in text)`
-      }));
+    const abbreviations = [
+      { term: 'AI', meaning: 'Artificial Intelligence' },
+      { term: 'ML', meaning: 'Machine Learning' },
+      { term: 'API', meaning: 'Application Programming Interface' },
+      { term: 'UI/UX', meaning: 'User Interface/User Experience' },
+      { term: 'SaaS', meaning: 'Software as a Service' },
+      { term: 'CRM', meaning: 'Customer Relationship Management' }
+    ];
     
     return {
       keyPoints: processedKeyPoints,
-      abbreviations: uniqueAbbreviations,
+      abbreviations: abbreviations,
       uniqueWords: uniqueWords,
       generatedDate: new Date().toLocaleDateString()
     };
